@@ -40,6 +40,7 @@
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QTouchEvent>
 #include <QNetworkAccessManager>
 #include <QNetworkCookie>
 #include <QNetworkRequest>
@@ -1503,6 +1504,57 @@ void WebPage::sendEvent(const QString& type, const QVariant& arg1, const QVarian
         // Post and process events
         QApplication::postEvent(m_customWebPage, event);
         QApplication::processEvents();
+        return;
+    }
+
+    // touch events
+    if (eventType == "touchstart" || eventType == "touchend") {
+        QTouchEvent::Type touchEventType = QEvent::None;
+
+        // Which touch event
+        if (eventType == "touchstart") {
+            touchEventType = QEvent::TouchBegin;
+        } else if (eventType == "touchend") {
+            touchEventType = QEvent::TouchEnd;
+        }
+        Q_ASSERT(touchEventType != QEvent::None);
+
+        QList<QTouchEvent::TouchPoint> touchPoints;
+        QTouchEvent::TouchPoint touchPoint;
+        touchPoint.setId(0);
+        touchPoint.setState(eventType == "touchstart"  ? Qt::TouchPointPressed : Qt::TouchPointReleased);
+        // Gather coordinates
+        if (arg1.isValid() && arg2.isValid()) {
+            touchPoint.setPos(QPoint(arg1.toInt(), arg2.toInt()));
+        }
+        touchPoint.setPressure(1);
+
+        touchPoints.append(touchPoint);
+        // Prepare the Mouse event
+        qDebug() << "Tap Event:" << eventType << "(" << touchEventType << ")" << touchPoint << ")" ;
+        QTouchEvent* event = new QTouchEvent(
+            touchEventType,
+            0, /* touch device */ 
+            keyboardModifiers,
+            0, /* touchPointStates */
+            touchPoints
+        );
+
+        // Post and process events
+        QApplication::postEvent(m_customWebPage, event);
+        QApplication::processEvents();
+        if (eventType == "touchstart") {
+            sendEvent("mousedown", arg1, arg2, mouseButton, modifierArg);
+        }
+        if (eventType == "touchend") {
+            sendEvent("mouseup", arg1, arg2, mouseButton, modifierArg);
+        }
+        return;
+    }
+
+    if (type == "tap") {
+        sendEvent("touchstart", arg1, arg2, mouseButton, modifierArg);
+        sendEvent("touchend", arg1, arg2, mouseButton, modifierArg);
         return;
     }
 
